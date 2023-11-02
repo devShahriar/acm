@@ -6,6 +6,7 @@ import (
 
 	"github.com/devShahriar/H"
 	"gorm.io/gorm"
+	"magic.pathao.com/carta/carta-acm/internal/config"
 	"magic.pathao.com/carta/carta-acm/internal/contract"
 	"magic.pathao.com/carta/carta-acm/internal/helper"
 	logger "magic.pathao.com/data/de-logger"
@@ -67,8 +68,7 @@ func (d *DbInstance) SignUp(req contract.SignUpRequest) (contract.LoginResponse,
 	organizationId, err := d.GetOrganizationId(req.OrgName)
 
 	if err != nil || organizationId == nil {
-		// multiple insertion into tables
-		//innsert innto org table
+
 		ordId, err := d.IngestOrganizationMeta(req)
 		if err != nil {
 			return contract.LoginResponse{}, err
@@ -121,7 +121,7 @@ func (d *DbInstance) SignUp(req contract.SignUpRequest) (contract.LoginResponse,
 		UserName:    req.UserName,
 		CreatedAt:   time.Now(),
 		Designation: req.Designation,
-		MemberId:    req.Id,
+		MemberId:    orgMember.Id,
 		AccessToken: accessToken,
 	}
 
@@ -271,6 +271,50 @@ func (d *DbInstance) UpdateRole(req contract.OrganizationMember) error {
 	if result.Error != nil {
 		return fmt.Errorf("This member does not exist. Error:%v", result.Error)
 	}
+	return nil
+}
+
+func (d *DbInstance) UpdateAccessToken(userId string, req contract.OrganizationMember) error {
+	// GET New permission for this new roleid
+
+	permissions, err := d.GetPermissionByRole(req.RoleId)
+	if err != nil {
+		fmt.Errorf("error while fetching permission for memberId:%v roleId:%v", req.Id, req.RoleId)
+	}
+
+	user, err := d.GetUser(userId)
+	if err != nil {
+		return fmt.Errorf("error while fetching user meta for userId:%v memberId:%v roleId:%v", userId, req.Id, req.RoleId)
+	}
+
+	jwtPayload, err := helper.ParseJWTToken(user.AccessToken, []byte(config.GetAppConfig().JWTSecretKey))
+	if err != nil {
+		return fmt.Errorf("error while parsing user access_token for userId:%v memberId:%v roleId:%v", userId, req.Id, req.RoleId)
+	}
+
+	d.Logger.Infof("Parsed JWT token : %+v", jwtPayload)
+
+	// newPayLoad := contract.JwtPayload{
+	// 	Id:          jwtPayload.Id,
+	// 	MemberId:    jwtPayload.MemberId,
+	// 	OrgId:       jwtPayload.OrgId,
+	// 	RoleId:      jwtPayload.RoleId,
+	// 	Permissions: permissions,
+	// 	Email:       jwtPayload.Email,
+	// }
+	jwtPayload.Permissions = permissions
+	d.Logger.Infof("New Parsed JWT token : %+v", jwtPayload)
+
+	newAccessToken, err := helper.GenerateAccessToken(*jwtPayload)
+	if err != nil {
+		return fmt.Errorf("error while updating user access_token for userId:%v memberId:%v roleId:%v", userId, req.Id, req.RoleId)
+	}
+
+	updateErr := d.Db.Model(&contract.Users{}).Where("id = ?", userId).Update("access_token", newAccessToken).Error
+	if updateErr != nil {
+		return fmt.Errorf("error while updating user access_token for userId:%v memberId:%v roleId:%v", userId, req.Id, req.RoleId)
+	}
+
 	return nil
 }
 

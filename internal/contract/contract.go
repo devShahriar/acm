@@ -53,12 +53,12 @@ type Msg struct {
 }
 
 type JwtPayload struct {
-	Id          string
-	Email       string
-	RoleId      int
-	OrgId       string
-	MemberId    string
-	Permissions []Permissions
+	Id          string        `json:"id"`
+	Email       string        `json:"email"`
+	RoleId      int           `json:"role_id"`
+	OrgId       string        `json:"org_id"`
+	MemberId    string        `json:"member_id"`
+	Permissions []Permissions `json:"permissions"`
 	jwt.RegisteredClaims
 }
 

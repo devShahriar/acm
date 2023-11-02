@@ -26,10 +26,10 @@ type DB interface {
 	UpdateApiStatus(req contract.ReqPayload) error
 	UpdateApiExpiry(req contract.ReqPayload) error
 	UpdateByColumnName(column string, req contract.ReqPayload, data interface{}) error
+	UpdateAccessToken(userId string, req contract.OrganizationMember) error
 
-	IsUserValid(userId string) bool
-	IsApiKeyValid(apiKey string) bool
-	IsValidToken(userId, apiKey string) bool
+	GetUser(userId string) (*contract.Users, error)
+	CheckValidUser(token string) (*contract.JwtPayload, error)
 
 	UpdateUsage(req contract.ReqPayload) error
 	GetApiMeta(apiKey, svcType string) (*contract.ApiMeta, error)

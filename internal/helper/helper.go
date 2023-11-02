@@ -58,14 +58,7 @@ func GenerateAccessToken(payload contract.JwtPayload) (string, error) {
 	return tokenString, nil
 }
 
-// func ParseJwt(token string) {
-
-// 	secretKey := config.GetAppConfig().JWTSecretKey
-
-// }
-
 func ParseJWTToken(tokenString string, secretKey []byte) (*contract.JwtPayload, error) {
-
 	claims := &contract.JwtPayload{}
 
 	// Parse the token
@@ -78,13 +71,19 @@ func ParseJWTToken(tokenString string, secretKey []byte) (*contract.JwtPayload, 
 		return secretKey, nil
 	})
 
-	// Check if there was an error in parsing the token
-	if claims, ok := token.Claims.(*contract.JwtPayload); ok && token.Valid {
-		fmt.Printf("user_id: %v %v\n", claims.Id, claims.RegisteredClaims.Issuer)
-		return claims, nil
+	if err != nil {
+		// Return here if there's an error parsing the token
+		return nil, err
 	}
 
-	return nil, err
+	// Check if the token's claims can be converted to JwtPayload and the token is valid
+	if claims, ok := token.Claims.(*contract.JwtPayload); ok && token.Valid {
+		fmt.Printf("user_id: %v, issuer: %v\n", claims.Id, claims.RegisteredClaims.Issuer)
+		return claims, nil
+	} else {
+		// Token is invalid
+		return nil, fmt.Errorf("invalid token")
+	}
 }
 
 func GenerateUUID() string {

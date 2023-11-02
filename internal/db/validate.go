@@ -1,49 +1,42 @@
 package db
 
 import (
+	"fmt"
+
 	"magic.pathao.com/carta/carta-acm/internal/config"
 	"magic.pathao.com/carta/carta-acm/internal/contract"
 	"magic.pathao.com/carta/carta-acm/internal/helper"
 )
 
-func (d *DbInstance) CheckPermission() {}
-
-func (d *DbInstance) IsUserValid(userId string) bool {
+func (d *DbInstance) GetUser(userId string) (*contract.Users, error) {
 
 	users := &contract.Users{}
 
 	err := d.Db.Model(&contract.Users{}).Where("id = ?", userId).First(users).Error
 	if err != nil || users == nil {
-		return false
+		return nil, err
 	}
-	return true
+	return users, nil
 }
 
 func (d *DbInstance) CheckValidUser(token string) (*contract.JwtPayload, error) {
 
 	secretKey := config.GetAppConfig().JWTSecretKey
-	helper.ParseJWTToken(token, []byte(secretKey))
-	return nil, nil
-}
+	jwtPayload, err := helper.ParseJWTToken(token, []byte(secretKey))
 
-func (d *DbInstance) IsApiKeyValid(apiKey string) bool {
-
-	apiMeta := &contract.ApiMeta{}
-
-	err := d.Db.Model(&contract.ApiMeta{}).Where("api_key = ?", apiKey).First(apiMeta).Error
-	if err != nil || apiMeta == nil {
-		return false
+	if err != nil || jwtPayload == nil {
+		return nil, fmt.Errorf("invalid user access token")
 	}
 
-	return true
+	user, err := d.GetUser(jwtPayload.Id)
 
-}
-
-func (d *DbInstance) IsValidToken(userId, apiKey string) bool {
-
-	if d.IsApiKeyValid(apiKey) && d.IsUserValid(userId) {
-		return true
-	} else {
-		return false
+	if err != nil {
+		return nil, fmt.Errorf("user doesn't exist in user table. id:", jwtPayload.Id)
 	}
+
+	if user.AccessToken != token {
+		return nil, fmt.Errorf("invalid user token user_id:%v token:%v", jwtPayload.Id, token)
+	}
+
+	return jwtPayload, nil
 }

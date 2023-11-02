@@ -23,3 +23,9 @@ func ParseRequest(r *http.Request, dst interface{}) error {
 
 	return nil
 }
+
+func ParseToken(r *http.Request, headerKey string) string {
+
+	token := r.Header.Get(headerKey)
+	return token
+}

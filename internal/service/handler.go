@@ -6,23 +6,9 @@ import (
 	"strings"
 
 	"github.com/labstack/echo"
-	"magic.pathao.com/carta/carta-acm/internal/config"
 	"magic.pathao.com/carta/carta-acm/internal/contract"
 	"magic.pathao.com/carta/carta-acm/internal/helper"
 )
-
-func (a AccountManagerService) Auth(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		authKey := c.Request().Header.Get("Authorization")
-		if authKey == config.GetAppConfig().AppKey {
-			return next(c)
-		} else {
-			return c.JSON(http.StatusUnauthorized, contract.Msg{
-				Message: "Unauthorized",
-			})
-		}
-	}
-}
 
 func (a AccountManagerService) Login(c echo.Context) error {
 
@@ -78,8 +64,8 @@ func (a AccountManagerService) GetRoles(c echo.Context) error {
 func (a AccountManagerService) AddOrganizationMember(c echo.Context) error {
 
 	requestPayload := &contract.AddMemberReq{}
-
 	ParseRequest(c.Request(), requestPayload)
+
 	a.Logger.Infof("%s", requestPayload)
 
 	member, err := a.Db.CheckMemberExists(requestPayload.OrganizationId, requestPayload.MemberEmail)
@@ -117,12 +103,37 @@ func (a AccountManagerService) UpdateRole(c echo.Context) error {
 	ParseRequest(c.Request(), requestPayload)
 	a.Logger.Infof("%s", requestPayload)
 
-	err := a.Db.UpdateRole(*requestPayload)
+	userId, err := GetUserIdFromContext(c)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, contract.Msg{Message: fmt.Sprintf("Failed to update permission for memberId: %v roleId: %v err:%v", requestPayload.Id, requestPayload.RoleId, err)})
+	}
+
+	err = a.Db.UpdateRole(*requestPayload)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, contract.Msg{Message: err.Error()})
 	}
-	return c.JSON(http.StatusOK, nil)
 
+	updateAccessErr := a.Db.UpdateAccessToken(userId, *requestPayload)
+	if updateAccessErr != nil {
+		return c.JSON(http.StatusBadRequest, contract.Msg{Message: fmt.Sprintf("Failed to update permission for memberId: %v roleId: %v", requestPayload.Id, requestPayload.RoleId)})
+	}
+
+	return c.JSON(http.StatusOK, contract.Msg{Message: "role updated"})
+
+}
+
+func GetUserIdFromContext(c echo.Context) (string, error) {
+	userIdInterface := c.Get("user_id")
+	if userIdInterface == nil {
+		return "", fmt.Errorf("user ID not found in the context")
+	}
+	userId, ok := userIdInterface.(string)
+	if !ok {
+		// Handle the case where userId is not a string
+		return "", fmt.Errorf("user ID is not a valid string")
+	}
+	// If the assertion is successful, return the userId
+	return userId, nil
 }
 
 func (a AccountManagerService) DeleteMember(c echo.Context) error {
@@ -139,15 +150,8 @@ func (a AccountManagerService) DeleteMember(c echo.Context) error {
 func (a AccountManagerService) GenerateApiKey(c echo.Context) error {
 
 	requestPayload := &contract.ReqPayload{}
-
 	ParseRequest(c.Request(), requestPayload)
 	a.Logger.Infof("%s", requestPayload)
-
-	if !a.Db.IsUserValid(requestPayload.UserId) {
-		return c.JSON(http.StatusForbidden, contract.Msg{
-			Message: fmt.Sprintf("User id:%s not authorized", requestPayload.UserId),
-		})
-	}
 
 	token, err := helper.GenerateUniqueAPIKey(requestPayload.UserId, requestPayload.Email, requestPayload.ServiceType)
 	if err != nil {
@@ -171,12 +175,6 @@ func (a AccountManagerService) GetApiKeys(c echo.Context) error {
 
 	userId := c.QueryParam("user-id")
 
-	if !a.Db.IsUserValid(userId) {
-		return c.JSON(http.StatusForbidden, contract.Msg{
-			Message: fmt.Sprintf("User id:%s not authorized", userId),
-		})
-	}
-
 	response, err := a.Db.GetApiKeys(userId)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, contract.Msg{
@@ -192,11 +190,6 @@ func (a AccountManagerService) UpdateApiMeta(c echo.Context) error {
 	requestPayload := &contract.ReqPayload{}
 	ParseRequest(c.Request(), requestPayload)
 
-	if !a.Db.IsValidToken(requestPayload.UserId, requestPayload.ApiKey) {
-		return c.JSON(http.StatusForbidden, contract.Msg{
-			Message: fmt.Sprintf("User id:%s not authorized", requestPayload.UserId),
-		})
-	}
 	fields := c.QueryParam("fields")
 	columnArray := strings.Split(fields, ",")
 
@@ -233,12 +226,6 @@ func (a AccountManagerService) AddPermission(c echo.Context) error {
 	requestPayload := &contract.ReqPayload{}
 	ParseRequest(c.Request(), requestPayload)
 
-	if !a.Db.IsValidToken(requestPayload.UserId, requestPayload.ApiKey) {
-		return c.JSON(http.StatusForbidden, contract.Msg{
-			Message: fmt.Sprintf("User id:%s not authorized", requestPayload.UserId),
-		})
-	}
-
 	err := a.Db.GenerateApiKey(requestPayload.ApiKey, *requestPayload)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, contract.Msg{
@@ -264,6 +251,7 @@ func (a AccountManagerService) UpdateUsage(c echo.Context) error {
 }
 
 func (a AccountManagerService) GetApiMeta(c echo.Context) error {
+
 	apiKey := c.Request().Header.Get("api_key")
 	svcType := c.Request().Header.Get("service_type")
 

@@ -1,5 +1,7 @@
 package service
 
+import "magic.pathao.com/carta/carta-acm/internal/contract"
+
 /*
 addMembers
 getMembers
@@ -14,22 +16,23 @@ addApiPermission
 
 func RegisterApi(acm *AccountManagerService) {
 
-	acm.Router.POST("/v1/login", acm.Auth(acm.Login))
-	acm.Router.POST("/v1/signup", acm.Auth(acm.SignUp))
+	acm.Router.POST("/v1/login", acm.Auth(Middleware(contract.PermDefault, acm.Login, false)))
+	acm.Router.POST("/v1/signup", acm.Auth(Middleware(contract.PermDefault, acm.SignUp, false)))
 
-	acm.Router.POST("/v1/generate/api-key", acm.Auth(acm.GenerateApiKey))
-	acm.Router.GET("/v1/api-keys", acm.Auth(acm.GetApiKeys))
-	acm.Router.POST("/v1/update-api-meta", acm.Auth(acm.UpdateApiMeta))
-	acm.Router.POST("/v1/add-permission", acm.Auth(acm.AddPermission))
+	acm.Router.POST("/v1/generate/api-key", acm.Auth(Middleware(contract.PermGenerateApiKey, acm.GenerateApiKey, true)))
+	acm.Router.GET("/v1/api-keys", acm.Auth(Middleware(contract.PermGetApiKeys, acm.GetApiKeys, true)))
 
-	acm.Router.GET("/v1/get-organizations", acm.Auth(acm.GetOrganizations))
-	acm.Router.GET("/v1/roles", acm.Auth(acm.GetRoles))
-	acm.Router.PATCH("/v1/update-role", acm.Auth(acm.UpdateRole))
+	acm.Router.POST("/v1/update-api-meta", acm.Auth(Middleware(contract.PermUpdateApiKeyMeta, acm.UpdateApiMeta, true)))
+	acm.Router.POST("/v1/add-permission", acm.Auth(Middleware(contract.PermAddApiPermission, acm.AddPermission, true)))
 
-	acm.Router.GET("/v1/members", acm.Auth(acm.GetMembers))
-	acm.Router.POST("/v1/members/add", acm.Auth(acm.AddOrganizationMember))
-	acm.Router.DELETE("/v1/delete/member", acm.Auth(acm.DeleteMember))
+	acm.Router.GET("/v1/get-organizations", acm.Auth(Middleware(contract.PermDefault, acm.GetOrganizations, false)))
+	acm.Router.GET("/v1/roles", acm.Auth(Middleware(contract.PermDefault, acm.GetRoles, false)))
 
-	acm.Router.POST("/v1/update-usage", acm.Auth(acm.UpdateUsage))
-	acm.Router.GET("/v1/get-api-meta", acm.Auth(acm.GetApiMeta))
+	acm.Router.PATCH("/v1/update-role", acm.Auth(Middleware(contract.PermUpdateRole, acm.UpdateRole, true)))
+	acm.Router.GET("/v1/members", acm.Auth(Middleware(contract.PermGetMembers, acm.GetMembers, true)))
+	acm.Router.POST("/v1/members/add", acm.Auth(Middleware(contract.PermAddMembers, acm.AddOrganizationMember, true)))
+	acm.Router.DELETE("/v1/delete/member", acm.Auth(Middleware(contract.PermDeleteMembers, acm.DeleteMember, true)))
+
+	acm.Router.POST("/v1/update-usage", acm.Auth(Middleware(contract.PermDefault, acm.UpdateUsage, false)))
+	acm.Router.GET("/v1/get-api-meta", acm.Auth(Middleware(contract.PermDefault, acm.GetApiMeta, false)))
 }

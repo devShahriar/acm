@@ -9,4 +9,5 @@ const (
 	PermGenerateApiKey   = "generateApiKey"
 	PermGetApiKeys       = "getApiKeys"
 	PermAddApiPermission = "addApiPermission"
+	PermDefault          = "default"
 )
